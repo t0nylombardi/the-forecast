@@ -1,0 +1,18 @@
+<% content_for :title, "Forecasts" %>
+
+<div class="w-full space-y-6">
+  <div id="flash">
+    <% if flash[:alert].present? %>
+      <p class="rounded-md bg-red-50 px-4 py-3 text-red-700"><%= flash[:alert] %></p>
+    <% end %>
+  </div>
+
+  <div class="space-y-2">
+    <h1 class="text-4xl font-bold">Forecasts</h1>
+    <p class="text-gray-600">Search by city or ZIP code to load the latest forecast.</p>
+  </div>
+
+  <%= render "location_form" %>
+
+  <%= render "forecast", forecast: @forecast %>
+</div>

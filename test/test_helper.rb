@@ -2,8 +2,25 @@ ENV["RAILS_ENV"] ||= "test"
 require_relative "../config/environment"
 require "rails/test_help"
 
+module TestStubHelper
+  def stub_singleton_method(object, method_name, callable)
+    singleton = class << object
+      self
+    end
+    original_method = singleton.instance_method(method_name) if singleton.method_defined?(method_name)
+
+    singleton.define_method(method_name, &callable)
+    yield
+  ensure
+    singleton.remove_method(method_name)
+    singleton.define_method(method_name, original_method) if original_method
+  end
+end
+
 module ActiveSupport
   class TestCase
+    include TestStubHelper
+
     # Run tests in parallel with specified workers
     parallelize(workers: :number_of_processors)
 
@@ -12,4 +29,8 @@ module ActiveSupport
 
     # Add more helper methods to be used by all tests here...
   end
+end
+
+class ActionDispatch::IntegrationTest
+  include TestStubHelper
 end
