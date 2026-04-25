@@ -1,9 +1,0 @@
-<%= turbo_stream.update "flash" do %>
-  <% if flash[:alert].present? %>
-    <p class="rounded-md bg-red-50 px-4 py-3 text-red-700"><%= flash[:alert] %></p>
-  <% end %>
-<% end %>
-
-<%= turbo_stream.replace "forecast" do %>
-  <%= render "forecast", forecast: @forecast %>
-<% end %>
