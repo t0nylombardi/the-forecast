@@ -10,7 +10,7 @@ module Weather
   # OpenWeather separates geocoding and weather endpoints.
   #
   class ApiClient
-    CURRENT_WEATHER_URL = "https://api.openweathermap.org/data/2.5/weather"
+    CURRENT_WEATHER_URL = "https://api.openweathermap.org/data/3.0/onecall?"
 
     API_KEY = Rails.application.credentials[:weather_api_key] || ENV["WEATHER_API_KEY"]
 
@@ -62,8 +62,9 @@ module Weather
       {
         lat: lat,
         lon: lon,
+        exclude: "hourly,minutely,alerts",
         appid: API_KEY,
-        units: "imperial" # returns Fahrenheit
+        units: "imperial"
       }
     end
   end
