@@ -2,68 +2,86 @@ require "test_helper"
 
 module Weather
   class ForecastServiceTest < ActiveSupport::TestCase
-    Response = Struct.new(:parsed_response, :success?)
+    Response = Struct.new(:body, :success?)
 
-    test ".call fetches a forecast using the ZIP code when present" do
-      response = Response.new({"location" => {"name" => "Brooklyn"}}, true)
-      received_query = nil
-
-      stub_singleton_method(ForecastService, :get, ->(_path, query:) {
-        received_query = query
-        response
-      }) do
-        result = ForecastService.call(location: "Brooklyn", zip_code: "11201")
-
-        assert_equal "11201", received_query[:q]
-        assert_equal "Brooklyn", result.dig("location", "name")
-      end
+    test ".call returns an empty hash when location is nil" do
+      assert_equal({}, ForecastService.call(location: nil))
     end
 
-    test ".call falls back to location when ZIP code is blank" do
-      response = Response.new({"location" => {"name" => "Austin"}}, true)
-      received_query = nil
+    test "#call returns cached data without hitting the API" do
+      service = ForecastService.new(location: "Brooklyn", postal_code: "11201")
+      api_client = Object.new
+      cache = Object.new
 
-      stub_singleton_method(ForecastService, :get, ->(_path, query:) {
-        received_query = query
-        response
-      }) do
-        result = ForecastService.call(location: "Austin, TX", zip_code: "")
-
-        assert_equal "Austin, TX", received_query[:q]
-        assert_equal "Austin", result.dig("location", "name")
+      cache.define_singleton_method(:read) { { "temp" => 67 } }
+      api_client.define_singleton_method(:fetch_forecast) do |_location|
+        flunk "expected cache hit to skip API call"
       end
+
+      service.instance_variable_set(:@cache, cache)
+      service.instance_variable_set(:@api_client, api_client)
+
+      assert_equal({ "temp" => 67 }, service.call)
     end
 
-    test ".call returns a normalized error payload for failed responses" do
-      response = Response.new({"error" => {"message" => "Invalid request"}}, false)
-      received_query = nil
+    test "#call fetches from the API and writes to cache on success" do
+      service = ForecastService.new(location: "Brooklyn", postal_code: "11201")
+      response = Response.new({ location: { name: "Brooklyn" }, current: { temp_f: 64 } }.to_json, true)
+      api_client = Object.new
+      cache = Object.new
+      written = nil
+      requested_location = nil
 
-      stub_singleton_method(ForecastService, :get, ->(_path, query:) {
-        received_query = query
+      cache.define_singleton_method(:read) { nil }
+      cache.define_singleton_method(:write) { |data| written = data }
+      api_client.define_singleton_method(:fetch_forecast) do |location|
+        requested_location = location
         response
-      }) do
-        result = ForecastService.call(location: "Chicago", zip_code: "60601")
-
-        assert_equal "60601", received_query[:q]
-        assert_equal({"error" => {"message" => "Invalid request"}}, result)
       end
+
+      service.instance_variable_set(:@cache, cache)
+      service.instance_variable_set(:@api_client, api_client)
+
+      result = service.call
+
+      assert_equal "Brooklyn", requested_location
+      assert_equal "Brooklyn", result.dig("location", "name")
+      assert_equal 64, result.dig("current", "temp_f")
+      assert_equal result, written
     end
 
-    test ".call returns a generic error when the HTTP request raises" do
-      received_query = nil
+    test "#call raises the nested API error message on failure" do
+      service = ForecastService.new(location: "Chicago")
+      response = Response.new({ error: { message: "Invalid request" } }.to_json, false)
+      api_client = Object.new
+      cache = Object.new
 
-      stub_singleton_method(ForecastService, :get, ->(_path, query:) {
-        received_query = query
-        raise Timeout::Error
-      }) do
-        result = ForecastService.call(location: "Seattle", zip_code: nil)
+      cache.define_singleton_method(:read) { nil }
+      api_client.define_singleton_method(:fetch_forecast) { |_location| response }
 
-        assert_equal "Seattle", received_query[:q]
-        assert_equal(
-          {"error" => {"message" => "Unable to fetch forecast right now."}},
-          result
-        )
-      end
+      service.instance_variable_set(:@cache, cache)
+      service.instance_variable_set(:@api_client, api_client)
+
+      error = assert_raises(ForecastService::Failure) { service.call }
+
+      assert_equal "Invalid request", error.message
+    end
+
+    test "#call falls back to a generic message for invalid JSON failures" do
+      service = ForecastService.new(location: "Seattle")
+      response = Response.new("not-json", false)
+      api_client = Object.new
+      cache = Object.new
+
+      cache.define_singleton_method(:read) { nil }
+      api_client.define_singleton_method(:fetch_forecast) { |_location| response }
+
+      service.instance_variable_set(:@cache, cache)
+      service.instance_variable_set(:@api_client, api_client)
+
+      error = assert_raises(ForecastService::Failure) { service.call }
+
+      assert_equal "Weather API request failed", error.message
     end
   end
 end

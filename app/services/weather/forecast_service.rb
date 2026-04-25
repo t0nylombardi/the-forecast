@@ -1,47 +1,88 @@
+# frozen_string_literal: true
+
 module Weather
+  # Orchestrates fetching weather forecasts from cache or API.
+  # Uses Weather::ApiClient for API requests and CacheRepository for caching.
+  #
+  # @example
+  #   forecast = Weather::ForecastService.call(location: "New York", postal_code: "10001")
+  #
+  # @raise [Weather::ForecastService::Failure] if the API request fails
   class ForecastService
-    include HTTParty
+    API_KEY = Rails.application.credentials[:weather_api_key]
+    class Failure < StandardError; end
 
-    base_uri "https://api.weatherapi.com/v1"
-
-    def initialize(location:, zip_code:)
+    def initialize(location:, postal_code: nil)
       @location = location
-      @zip_code = zip_code
+      @postal_code = postal_code
+      @api_client = ApiClient.new
+      @cache = CacheRepository.new(postal_code: postal_code, location: location)
     end
 
-    def self.call(location:, zip_code:)
-      new(location:, zip_code:).call
+    # Fetches weather forecast data from the API.
+    #
+    # @param [String] location The location to fetch the forecast for.
+    # @param [String, nil] postal_code The postal code to fetch the forecast for.
+    #
+    # @return [Hash] The weather forecast data.
+    def self.call(location:, postal_code: nil)
+      new(location: location, postal_code: postal_code).call
     end
 
+    # Retrieves the forecast data, using cache if available.
+    #
+    # @return [Hash] Forecast data.
+    # @raise [Failure] When API request fails.
     def call
-      response = self.class.get(
-        "/forecast.json",
-        query: {
-          key: ENV.fetch("WEATHER_API_KEY", nil),
-          q: query,
-          days: 5,
-          aqi: "no",
-          alerts: "no"
-        }
-      )
+      return {} unless location
 
-      return response.parsed_response if response.success?
+      cached = cache.read
+      return cached if cached
 
-      {"error" => {"message" => error_message_for(response)}}
-    rescue StandardError
-      {"error" => {"message" => "Unable to fetch forecast right now."}}
+      fetch_from_api
     end
 
     private
 
-    attr_reader :location, :zip_code
+    attr_reader :location, :postal_code, :api_client, :cache
 
-    def query
-      zip_code.presence || location.to_s.strip
+    # Fetches weather forecast data from the API.
+    #
+    # @return [Hash] The weather forecast data.
+    def fetch_from_api
+      response = perform_request
+      return handle_success(response) if response.success?
+      handle_failure(response)
     end
 
-    def error_message_for(response)
-      response.parsed_response.dig("error", "message").presence || "Unable to fetch forecast right now."
+    def perform_request
+      api_client.fetch_forecast(location)
+    end
+
+    def handle_success(response)
+      data = parse_json(response.body)
+      cache.write(data)
+      data
+    end
+
+    def handle_failure(response)
+      error_data = parse_json_safe(response.body)
+      message = extract_error_message(error_data)
+      raise Failure, message
+    end
+
+    def parse_json(body)
+      JSON.parse(body)
+    end
+
+    def parse_json_safe(body)
+      parse_json(body)
+    rescue
+      {}
+    end
+
+    def extract_error_message(error_data)
+      error_data["error"]&.dig("message") || "Weather API request failed"
     end
   end
 end
