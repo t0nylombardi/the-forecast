@@ -5,7 +5,7 @@ require "rails/test_help"
 module TestStubHelper
   def stub_singleton_method(object, method_name, callable)
     singleton = class << object
-      self
+                  self
     end
     original_method = singleton.instance_method(method_name) if singleton.method_defined?(method_name)
 

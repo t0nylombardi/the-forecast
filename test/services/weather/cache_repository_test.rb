@@ -2,28 +2,8 @@ require "test_helper"
 
 module Weather
   class CacheRepositoryTest < ActiveSupport::TestCase
-    test "#read returns parsed JSON when the cache stores a string" do
-      repository = CacheRepository.new(postal_code: "10001", location: "New York")
-      store = { "weather_forecast_10001" => { temp: 72 }.to_json }
-      cache = build_cache_double(store)
-
-      stub_singleton_method(Rails, :cache, -> { cache }) do
-        assert_equal 72, repository.read["temp"]
-      end
-    end
-
-    test "#read returns hashes unchanged" do
-      repository = CacheRepository.new(location: "New York")
-      store = { "weather_forecast_new-york" => { "temp" => 68 } }
-      cache = build_cache_double(store)
-
-      stub_singleton_method(Rails, :cache, -> { cache }) do
-        assert_equal({ "temp" => 68 }, repository.read)
-      end
-    end
-
     test "#read returns nil when nothing is cached" do
-      repository = CacheRepository.new(location: "Boston")
+      repository = CacheRepository.new(postal_code: "10001")
       cache = build_cache_double({})
 
       stub_singleton_method(Rails, :cache, -> { cache }) do
@@ -31,38 +11,50 @@ module Weather
       end
     end
 
-    test "#write stores data with cache metadata using postal code when present" do
-      repository = CacheRepository.new(postal_code: "10001", location: "New York")
+    test "#read returns a duplicated cached payload and marks it as a cache hit" do
+      repository = CacheRepository.new(postal_code: "10001")
+      stored_payload = {
+        data: {current: {temperature: 72}},
+        cache: {hit: false, key: "weather_forecast:10001", stored_at: Time.current}
+      }
+      cache = build_cache_double("weather_forecast:10001" => stored_payload)
+
+      stub_singleton_method(Rails, :cache, -> { cache }) do
+        result = repository.read
+
+        assert_equal 72, result.dig(:data, :current, :temperature)
+        assert_equal true, result.dig(:cache, :hit)
+        assert_equal false, stored_payload.dig(:cache, :hit)
+        refute_same stored_payload, result
+      end
+    end
+
+    test "#write stores wrapped payload with cache metadata" do
+      repository = CacheRepository.new(postal_code: "10001")
       store = {}
       cache = build_cache_double(store)
 
       stub_singleton_method(Rails, :cache, -> { cache }) do
         travel_to Time.zone.parse("2026-04-24 15:45:00 UTC") do
-          repository.write({ "temp" => 70 })
+          result = repository.write(current: {temperature: 70})
+
+          assert_equal result, store["weather_forecast:10001"]
+          assert_equal 70, result.dig(:data, :current, :temperature)
+          assert_equal false, result.dig(:cache, :hit)
+          assert_equal "weather_forecast:10001", result.dig(:cache, :key)
+          assert_equal Time.zone.parse("2026-04-24 15:45:00 UTC"), result.dig(:cache, :stored_at)
         end
-
-        cached = store["weather_forecast_10001"]
-
-        assert_equal 70, cached["temp"]
-        assert_equal "New York", cached.dig(:cached, :location)
-        assert_equal "10001", cached.dig(:cached, :postal_code)
-        assert_equal "Apr 24, 2026 11:45 AM", cached.dig(:cached, :at)
       end
     end
 
-    test "#write parameterizes the location when postal code is absent" do
-      repository = CacheRepository.new(location: "San Francisco, CA")
-      store = {}
-      cache = build_cache_double(store)
+    test "#write raises when postal code is blank" do
+      repository = CacheRepository.new(postal_code: nil)
+      cache = build_cache_double({})
 
       stub_singleton_method(Rails, :cache, -> { cache }) do
-        travel_to Time.zone.parse("2026-04-24 12:00:00 UTC") do
-          repository.write({ "temp" => 58 })
-        end
+        error = assert_raises(ArgumentError) { repository.write(current: {temperature: 70}) }
 
-        cached = store["weather_forecast_san-francisco-ca"]
-
-        assert_equal 58, cached["temp"]
+        assert_equal "postal_code is required for caching", error.message
       end
     end
 

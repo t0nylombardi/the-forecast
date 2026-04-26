@@ -4,21 +4,18 @@ module Weather
   class ApiClientTest < ActiveSupport::TestCase
     Response = Struct.new(:body, :success?)
 
-    test "#fetch_coordinates raises when API key is missing" do
-      with_replaced_const(ApiClient, :API_KEY, nil) do
-        error = assert_raises(ApiClient::Error) do
-          ApiClient.new.fetch_coordinates(postal_code: "10001")
-        end
-
-        assert_equal "Missing API key", error.message
+    class TestClient < ApiClient
+      def fetch_payload
+        get_json(
+          "https://example.com/weather",
+          query: {appid: api_key},
+          default_error: "Request failed"
+        )
       end
     end
 
-    test "#fetch_coordinates returns parsed ZIP geocoding data" do
-      response = Response.new(
-        { zip: "90210", name: "Beverly Hills", lat: 34.0901, lon: -118.4065, country: "US" }.to_json,
-        true
-      )
+    test "#get_json returns parsed JSON for successful responses" do
+      response = Response.new({"status" => "ok"}.to_json, true)
       request_url = nil
       request_query = nil
       request_timeout = nil
@@ -30,112 +27,44 @@ module Weather
           request_timeout = timeout
           response
         }) do
-          result = ApiClient.new.fetch_coordinates(postal_code: "90210")
+          result = TestClient.new.fetch_payload
 
-          assert_equal ApiClient::GEOCODE_URL, request_url
-          assert_equal 5, request_timeout
-          assert_equal({ zip: "90210,US", appid: "test-key" }, request_query)
-          assert_equal "90210", result["zip"]
-          assert_equal 34.0901, result["lat"]
-          assert_equal(-118.4065, result["lon"])
+          assert_equal "https://example.com/weather", request_url
+          assert_equal({appid: "test-key"}, request_query)
+          assert_equal ApiClient::TIMEOUT_SECONDS, request_timeout
+          assert_equal "ok", result["status"]
         end
       end
     end
 
-    test "#fetch_coordinates raises the API error message on failed requests" do
-      response = Response.new({ message: "city not found" }.to_json, false)
+    test "#api_key raises when the API key is missing" do
+      with_replaced_const(ApiClient, :API_KEY, nil) do
+        error = assert_raises(ApiClient::Error) { TestClient.new.fetch_payload }
+
+        assert_equal "Missing OpenWeather API key", error.message
+      end
+    end
+
+    test "#handle_failure raises the API error message on failed requests" do
+      response = Response.new({message: "city not found"}.to_json, false)
 
       with_replaced_const(ApiClient, :API_KEY, "test-key") do
         stub_singleton_method(HTTParty, :get, ->(*, **) { response }) do
-          error = assert_raises(ApiClient::Error) do
-            ApiClient.new.fetch_coordinates(postal_code: "00000")
-          end
+          error = assert_raises(ApiClient::Error) { TestClient.new.fetch_payload }
 
           assert_equal "city not found", error.message
         end
       end
     end
 
-    test "#fetch_coordinates falls back to a generic error for invalid JSON failures" do
+    test "#handle_failure falls back to the default error for invalid JSON" do
       response = Response.new("not-json", false)
 
       with_replaced_const(ApiClient, :API_KEY, "test-key") do
         stub_singleton_method(HTTParty, :get, ->(*, **) { response }) do
-          error = assert_raises(ApiClient::Error) do
-            ApiClient.new.fetch_coordinates(postal_code: "00000")
-          end
+          error = assert_raises(ApiClient::Error) { TestClient.new.fetch_payload }
 
-          assert_equal "Geocoding request failed", error.message
-        end
-      end
-    end
-
-    test "#fetch_forecast raises when API key is missing" do
-      with_replaced_const(ApiClient, :API_KEY, nil) do
-        error = assert_raises(ApiClient::Error) do
-          ApiClient.new.fetch_forecast(lat: 40.71, lon: -74.0)
-        end
-
-        assert_equal "Missing API key", error.message
-      end
-    end
-
-    test "#fetch_forecast returns parsed weather data" do
-      response = Response.new({ current: { temp: 72 }, daily: [] }.to_json, true)
-      request_url = nil
-      request_query = nil
-      request_timeout = nil
-
-      with_replaced_const(ApiClient, :API_KEY, "test-key") do
-        stub_singleton_method(HTTParty, :get, ->(url, query:, timeout:) {
-          request_url = url
-          request_query = query
-          request_timeout = timeout
-          response
-        }) do
-          result = ApiClient.new.fetch_forecast(lat: 40.71, lon: -74.0)
-
-          assert_equal ApiClient::FORECAST_URL, request_url
-          assert_equal 5, request_timeout
-          assert_equal(
-            {
-              lat: 40.71,
-              lon: -74.0,
-              exclude: "hourly,minutely,alerts",
-              appid: "test-key",
-              units: "imperial"
-            },
-            request_query
-          )
-          assert_equal 72, result.dig("current", "temp")
-        end
-      end
-    end
-
-    test "#fetch_forecast raises the API error message on failed requests" do
-      response = Response.new({ message: "invalid coordinates" }.to_json, false)
-
-      with_replaced_const(ApiClient, :API_KEY, "test-key") do
-        stub_singleton_method(HTTParty, :get, ->(*, **) { response }) do
-          error = assert_raises(ApiClient::Error) do
-            ApiClient.new.fetch_forecast(lat: 0, lon: 0)
-          end
-
-          assert_equal "invalid coordinates", error.message
-        end
-      end
-    end
-
-    test "#fetch_forecast falls back to a generic error for invalid JSON failures" do
-      response = Response.new("not-json", false)
-
-      with_replaced_const(ApiClient, :API_KEY, "test-key") do
-        stub_singleton_method(HTTParty, :get, ->(*, **) { response }) do
-          error = assert_raises(ApiClient::Error) do
-            ApiClient.new.fetch_forecast(lat: 0, lon: 0)
-          end
-
-          assert_equal "Weather API request failed", error.message
+          assert_equal "Request failed", error.message
         end
       end
     end
