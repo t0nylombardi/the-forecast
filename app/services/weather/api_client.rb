@@ -4,43 +4,30 @@ module Weather
   # Handles communication with the OpenWeather API.
   #
   # Responsibilities:
-  # - Fetch current weather using coordinates
-  #
-  # NOTE:
-  # OpenWeather separates geocoding and weather endpoints.
-  #
+  # - Fetch forecast data using coordinates
   class ApiClient
-    CURRENT_WEATHER_URL = "https://api.openweathermap.org/data/3.0/onecall?"
+    FORECAST_URL = "https://api.openweathermap.org/data/3.0/onecall"
 
     API_KEY = Rails.application.credentials[:weather_api_key] || ENV["WEATHER_API_KEY"]
 
     class Error < StandardError; end
 
-    # Public: Fetch weather using coordinates
+    # Public: Fetch forecast data using coordinates.
     #
     # @param lat [Float]
     # @param lon [Float]
     # @return [Hash]
-    def fetch_current_weather(lat:, lon:)
+    def fetch_forecast(lat:, lon:)
       raise Error, "Missing API key" if API_KEY.blank?
 
-      fetch_weather_by_coords(lat, lon)
-    end
-
-    private
-
-    # Step 2: Fetch weather by lat/lon
-    #
-    # @param lat [Float]
-    # @param lon [Float]
-    # @return [Hash]
-    def fetch_weather_by_coords(lat, lon)
-      response = HTTParty.get(CURRENT_WEATHER_URL, query: weather_params(lat, lon))
+      response = HTTParty.get(FORECAST_URL, query: forecast_params(lat, lon), timeout: 5)
 
       return handle_success(response) if response.success?
 
       handle_failure(response)
     end
+
+    private
 
     def handle_success(response)
       JSON.parse(response.body)
@@ -58,7 +45,7 @@ module Weather
       {}
     end
 
-    def weather_params(lat, lon)
+    def forecast_params(lat, lon)
       {
         lat: lat,
         lon: lon,

@@ -19,8 +19,8 @@ class ForecastsControllerTest < ActionDispatch::IntegrationTest
     }
     received_arguments = nil
 
-    stub_singleton_method(Weather::ForecastService, :call, ->(location:, zip_code:) {
-      received_arguments = [location, zip_code]
+    stub_singleton_method(Weather::ForecastService, :call, ->(location:, postal_code:) {
+      received_arguments = [location, postal_code]
       forecast_payload
     }) do
       patch update_forecast_forecasts_url,
@@ -39,9 +39,9 @@ class ForecastsControllerTest < ActionDispatch::IntegrationTest
     error_payload = {"error" => {"message" => "Location not found"}}
     received_arguments = nil
 
-    stub_singleton_method(Weather::ForecastService, :call, ->(location:, zip_code:) {
-      received_arguments = [location, zip_code]
-      error_payload
+    stub_singleton_method(Weather::ForecastService, :call, ->(location:, postal_code:) {
+      received_arguments = [location, postal_code]
+      raise Weather::ForecastService::Failure, error_payload.dig("error", "message")
     }) do
       patch update_forecast_forecasts_url,
         params: {location: "Atlantis"},

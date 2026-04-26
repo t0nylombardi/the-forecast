@@ -2,19 +2,20 @@
 
 module Weather
   # Orchestrates fetching weather forecasts from cache or API.
-  # Uses Weather::ApiClient for API requests and CacheRepository for caching.
+  # Uses Weather::Geocoder to resolve a US ZIP code, Weather::ApiClient for
+  # forecast requests, and CacheRepository for caching.
   #
   # @example
   #   forecast = Weather::ForecastService.call(location: "New York", postal_code: "10001")
   #
-  # @raise [Weather::ForecastService::Failure] if the API request fails
+  # @raise [Weather::ForecastService::Failure] if the geocoding or forecast request fails
   class ForecastService
-    API_KEY = Rails.application.credentials[:weather_api_key]
     class Failure < StandardError; end
 
     def initialize(location:, postal_code: nil)
       @location = location
       @postal_code = postal_code
+      @geocoder = Geocoder
       @api_client = ApiClient.new
       @cache = CacheRepository.new(postal_code: postal_code, location: location)
     end
@@ -32,57 +33,27 @@ module Weather
     # Retrieves the forecast data, using cache if available.
     #
     # @return [Hash] Forecast data.
-    # @raise [Failure] When API request fails.
+    # @raise [Failure] When geocoding or forecast lookup fails.
     def call
-      return {} unless location
+      return {} if postal_code.blank? && location.blank?
 
       cached = cache.read
       return cached if cached
 
       fetch_from_api
+    rescue Geocoder::Error, ApiClient::Error => e
+      raise Failure, e.message
     end
 
     private
 
-    attr_reader :location, :postal_code, :api_client, :cache
+    attr_reader :location, :postal_code, :geocoder, :api_client, :cache
 
-    # Fetches weather forecast data from the API.
-    #
-    # @return [Hash] The weather forecast data.
     def fetch_from_api
-      response = perform_request
-      return handle_success(response) if response.success?
-      handle_failure(response)
-    end
-
-    def perform_request
-      api_client.fetch_forecast(location)
-    end
-
-    def handle_success(response)
-      data = parse_json(response.body)
+      coordinates = geocoder.call(postal_code)
+      data = api_client.fetch_forecast(lat: coordinates[:lat], lon: coordinates[:lon])
       cache.write(data)
       data
-    end
-
-    def handle_failure(response)
-      error_data = parse_json_safe(response.body)
-      message = extract_error_message(error_data)
-      raise Failure, message
-    end
-
-    def parse_json(body)
-      JSON.parse(body)
-    end
-
-    def parse_json_safe(body)
-      parse_json(body)
-    rescue
-      {}
-    end
-
-    def extract_error_message(error_data)
-      error_data["error"]&.dig("message") || "Weather API request failed"
     end
   end
 end
