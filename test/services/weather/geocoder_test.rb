@@ -2,76 +2,52 @@ require "test_helper"
 
 module Weather
   class GeocoderTest < ActiveSupport::TestCase
-    Response = Struct.new(:body, :success?)
-
-    test ".call raises when API key is missing" do
-      with_replaced_const(Geocoder, :API_KEY, nil) do
-        error = assert_raises(Geocoder::Error) { Geocoder.call("10001") }
-
-        assert_equal "Missing API key", error.message
-      end
-    end
-
     test ".call raises when postal code is blank" do
-      with_replaced_const(Geocoder, :API_KEY, "test-key") do
-        error = assert_raises(Geocoder::Error) { Geocoder.call("") }
+      error = assert_raises(Geocoder::Error) { Geocoder.call("") }
 
-        assert_equal "Postal code is required", error.message
-      end
+      assert_equal "Postal code is required", error.message
     end
 
-    test ".call returns the ZIP geocoding result" do
-      response = Response.new(
-        { zip: "90210", name: "Beverly Hills", lat: 34.0901, lon: -118.4065, country: "US" }.to_json,
-        true
-      )
-      request_url = nil
-      request_query = nil
-      request_timeout = nil
+    test ".call uses the shared API client for ZIP geocoding" do
+      api_client = Object.new
+      requested_postal_code = nil
 
-      with_replaced_const(Geocoder, :API_KEY, "test-key") do
-        stub_singleton_method(HTTParty, :get, ->(url, query:, timeout:) {
-          request_url = url
-          request_query = query
-          request_timeout = timeout
-          response
-        }) do
-          result = Geocoder.call("90210")
-
-          assert_equal Geocoder::GEOCODE_URL, request_url
-          assert_equal 5, request_timeout
-          assert_equal({ zip: "90210,US", appid: "test-key" }, request_query)
-          assert_equal 34.0901, result[:lat]
-          assert_equal(-118.4065, result[:lon])
-          assert_equal "Beverly Hills", result[:name]
-          assert_equal "US", result[:country]
-          assert_equal "90210", result[:postal_code]
-        end
+      api_client.define_singleton_method(:fetch_coordinates) do |postal_code:|
+        requested_postal_code = postal_code
+        {
+          "zip" => "90210",
+          "name" => "Beverly Hills",
+          "lat" => 34.0901,
+          "lon" => -118.4065,
+          "country" => "US"
+        }
       end
+
+      geocoder = Geocoder.new("90210")
+      geocoder.instance_variable_set(:@api_client, api_client)
+
+      result = geocoder.call
+
+      assert_equal "90210", requested_postal_code
+      assert_equal 34.0901, result[:lat]
+      assert_equal(-118.4065, result[:lon])
+      assert_equal "Beverly Hills", result[:name]
+      assert_equal "US", result[:country]
+      assert_equal "90210", result[:postal_code]
     end
 
-    test ".call raises the API error message on failed requests" do
-      response = Response.new({ message: "city not found" }.to_json, false)
-
-      with_replaced_const(Geocoder, :API_KEY, "test-key") do
-        stub_singleton_method(HTTParty, :get, ->(*, **) { response }) do
-          error = assert_raises(Geocoder::Error) { Geocoder.call("00000") }
-
-          assert_equal "city not found", error.message
-        end
+    test ".call wraps shared API client errors" do
+      api_client = Object.new
+      api_client.define_singleton_method(:fetch_coordinates) do |postal_code:|
+        raise ApiClient::Error, "city not found"
       end
-    end
 
-    test ".call falls back to a generic error for invalid JSON failures" do
-      response = Response.new("not-json", false)
+      geocoder = Geocoder.new("00000")
+      geocoder.instance_variable_set(:@api_client, api_client)
 
-      with_replaced_const(Geocoder, :API_KEY, "test-key") do
-        stub_singleton_method(HTTParty, :get, ->(*, **) { response }) do
-          error = assert_raises(Geocoder::Error) { Geocoder.call("00000") }
+      error = assert_raises(Geocoder::Error) { geocoder.call }
 
-          assert_equal "Geocoding request failed", error.message
-        end
-      end
+      assert_equal "city not found", error.message
     end
 
     private

@@ -1,59 +1,98 @@
 # frozen_string_literal: true
 
 module Weather
-  # Orchestrates fetching weather forecasts from cache or API.
-  # Uses Weather::Geocoder to resolve a US ZIP code, Weather::ApiClient for
-  # forecast requests, and CacheRepository for caching.
+  # Orchestrates the full forecast lookup flow.
   #
-  # @example
-  #   forecast = Weather::ForecastService.call(location: "New York", postal_code: "10001")
+  # Intent:
+  # - Act as the single application entry point for "fetch me a forecast by ZIP
+  #   code".
+  # - Coordinate caching, geocoding, forecast retrieval, and normalization.
+  # - Translate lower-level infrastructure errors into a single service-level
+  #   failure type for callers.
   #
-  # @raise [Weather::ForecastService::Failure] if the geocoding or forecast request fails
+  # Flow:
+  # 1. Require a ZIP code.
+  # 2. Check forecast cache by ZIP code.
+  # 3. Resolve ZIP code into coordinates.
+  # 4. Fetch raw forecast data from OpenWeather.
+  # 5. Normalize the raw API response.
+  # 6. Cache and return the normalized forecast.
+  #
+  # Controllers and other callers should depend on this class rather than
+  # coordinating lower-level collaborators themselves.
   class ForecastService
+    # Raised when the overall forecast lookup use case cannot be completed.
     class Failure < StandardError; end
 
-    def initialize(location:, postal_code: nil)
-      @location = location
+    # Convenience entry point for forecast lookup.
+    #
+    # @param postal_code [String] US ZIP code to fetch forecast data for
+    # @return [Hash] wrapped normalized forecast payload
+    # @raise [Failure] when validation, geocoding, forecast lookup, or caching
+    #   prerequisites fail
+    def self.call(postal_code:)
+      new(postal_code: postal_code).call
+    end
+
+    # @param postal_code [String] ZIP code for the forecast lookup
+    # @param geocoder [#call] collaborator that resolves ZIP code to coordinates
+    # @param forecast_client [#fetch_forecast] client that fetches raw forecast
+    #   data for coordinates
+    # @param normalizer [#call] collaborator that converts raw vendor data into
+    #   the app's normalized forecast contract
+    # @param cache [#read, #write] cache repository used to memoize normalized
+    #   responses by ZIP code
+    def initialize(
+      postal_code:,
+      geocoder: Geocoder,
+      forecast_client: ForecastClient.new,
+      normalizer: ForecastNormalizer,
+      cache: CacheRepository.new(postal_code: postal_code)
+    )
       @postal_code = postal_code
-      @geocoder = Geocoder
-      @api_client = ApiClient.new
-      @cache = CacheRepository.new(postal_code: postal_code, location: location)
+      @geocoder = geocoder
+      @forecast_client = forecast_client
+      @normalizer = normalizer
+      @cache = cache
     end
 
-    # Fetches weather forecast data from the API.
+    # Executes the forecast lookup use case.
     #
-    # @param [String] location The location to fetch the forecast for.
-    # @param [String, nil] postal_code The postal code to fetch the forecast for.
-    #
-    # @return [Hash] The weather forecast data.
-    def self.call(location:, postal_code: nil)
-      new(location: location, postal_code: postal_code).call
-    end
-
-    # Retrieves the forecast data, using cache if available.
-    #
-    # @return [Hash] Forecast data.
-    # @raise [Failure] When geocoding or forecast lookup fails.
+    # @return [Hash] wrapped normalized forecast payload from cache or fresh API
+    #   lookup
+    # @raise [Failure] when any collaborator raises a recoverable domain or API
+    #   error
     def call
-      return {} if postal_code.blank? && location.blank?
+      raise Failure, "Postal code is required" if postal_code.blank?
 
       cached = cache.read
       return cached if cached
 
-      fetch_from_api
-    rescue Geocoder::Error, ApiClient::Error => e
+      fetch_and_cache_forecast
+    rescue Geocoder::Error, ApiClient::Error, ArgumentError => e
       raise Failure, e.message
     end
 
     private
 
-    attr_reader :location, :postal_code, :geocoder, :api_client, :cache
+    attr_reader :postal_code, :geocoder, :forecast_client, :normalizer, :cache
 
-    def fetch_from_api
+    # Fetches, normalizes, caches, and returns a forecast for the configured ZIP
+    # code.
+    #
+    # @return [Hash] wrapped normalized forecast payload as returned by
+    #   {CacheRepository#write}
+    def fetch_and_cache_forecast
       coordinates = geocoder.call(postal_code)
-      data = api_client.fetch_forecast(lat: coordinates[:lat], lon: coordinates[:lon])
-      cache.write(data)
-      data
+
+      raw_forecast = forecast_client.fetch_forecast(
+        lat: coordinates[:lat],
+        lon: coordinates[:lon]
+      )
+
+      normalized_forecast = normalizer.call(raw_forecast)
+
+      cache.write(normalized_forecast)
     end
   end
 end

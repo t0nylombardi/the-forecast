@@ -1,58 +1,96 @@
 # frozen_string_literal: true
 
 module Weather
-  # Handles communication with the OpenWeather API.
+  # Shared OpenWeather API behavior.
   #
-  # Responsibilities:
-  # - Fetch forecast data using coordinates
+  # Intent:
+  # - Provide one place for transport-level OpenWeather behavior.
+  # - Keep endpoint-specific clients focused on endpoint-specific query logic.
+  # - Enforce a consistent error-handling contract across all API calls.
+  #
+  # This class is not meant to be called directly by controllers or higher-level
+  # domain services. Instead, concrete clients such as {GeocoderClient} and
+  # {ForecastClient} inherit from it and supply only the endpoint URL, query
+  # parameters, and default failure message for their specific use case.
+  #
+  # The goal is to keep the HTTP boundary SOLID:
+  # - subclasses own endpoint-specific request construction
+  # - this base class owns shared request execution and response handling
+  #
+  # @abstract Subclass and call {#get_json} to perform API requests.
   class ApiClient
-    FORECAST_URL = "https://api.openweathermap.org/data/3.0/onecall"
-
+    # OpenWeather API key loaded from Rails credentials or environment.
+    #
+    # @return [String, nil]
     API_KEY = Rails.application.credentials[:weather_api_key] || ENV["WEATHER_API_KEY"]
 
-    class Error < StandardError; end
-
-    # Public: Fetch forecast data using coordinates.
+    # Shared timeout for all outbound OpenWeather requests.
     #
-    # @param lat [Float]
-    # @param lon [Float]
-    # @return [Hash]
-    def fetch_forecast(lat:, lon:)
-      raise Error, "Missing API key" if API_KEY.blank?
+    # @return [Integer]
+    TIMEOUT_SECONDS = 5
 
-      response = HTTParty.get(FORECAST_URL, query: forecast_params(lat, lon), timeout: 5)
-
-      return handle_success(response) if response.success?
-
-      handle_failure(response)
-    end
+    # Raised when a request cannot be completed successfully or when shared
+    # client prerequisites are not met.
+    #
+    # @see #api_key
+    # @see #get_json
+    class Error < StandardError; end
 
     private
 
-    def handle_success(response)
-      JSON.parse(response.body)
+    # Returns the configured OpenWeather API key.
+    #
+    # @return [String]
+    # @raise [Error] when no API key has been configured
+    def api_key
+      raise Error, "Missing OpenWeather API key" if API_KEY.blank?
+
+      API_KEY
     end
 
-    def handle_failure(response)
-      error = parse_json_safe(response.body)
-      message = error["message"] || "Weather API request failed"
+    # Executes a GET request and parses a successful JSON response.
+    #
+    # Concrete API clients delegate to this helper so response parsing, timeout
+    # behavior, and error handling remain consistent regardless of endpoint.
+    #
+    # @param url [String] the full OpenWeather endpoint URL
+    # @param query [Hash] query string parameters for the request
+    # @param default_error [String] fallback error message when the API does not
+    #   return a usable message payload
+    # @return [Hash, Array] parsed JSON body from the response
+    # @raise [Error] when the request fails or returns non-success status
+    def get_json(url, query:, default_error:)
+      response = HTTParty.get(url, query: query, timeout: TIMEOUT_SECONDS)
+
+      return JSON.parse(response.body) if response.success?
+
+      handle_failure(response, default_error:)
+    end
+
+    # Raises a normalized API error from a failed HTTP response.
+    #
+    # @param response [#body] HTTP response object returned by HTTParty
+    # @param default_error [String] fallback message when the response body is
+    #   empty, invalid, or missing a `message` field
+    # @raise [Error] always
+    def handle_failure(response, default_error:)
+      payload = parse_json_safe(response.body)
+      message = payload["message"].presence || default_error
+
       raise Error, message
     end
 
+    # Parses JSON while swallowing parser errors into an empty hash.
+    #
+    # This is intentionally defensive because upstream APIs can return non-JSON
+    # or partially structured failure responses.
+    #
+    # @param body [String]
+    # @return [Hash, Array]
     def parse_json_safe(body)
       JSON.parse(body)
-    rescue
+    rescue JSON::ParserError
       {}
-    end
-
-    def forecast_params(lat, lon)
-      {
-        lat: lat,
-        lon: lon,
-        exclude: "hourly,minutely,alerts",
-        appid: API_KEY,
-        units: "imperial"
-      }
     end
   end
 end

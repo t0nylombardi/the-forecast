@@ -1,50 +1,81 @@
 # frozen_string_literal: true
 
 module Weather
-  # Handles storing and retrieving weather forecasts from cache.
+  # Stores and retrieves normalized forecasts by ZIP code.
+  #
+  # Intent:
+  # - Encapsulate cache key generation and cache metadata shape.
+  # - Keep cache semantics out of controllers and orchestration services.
+  # - Return a consistent envelope regardless of cache hit or fresh write.
+  #
+  # The cache return shape is intentionally consistent:
+  #
+  # {
+  #   data: { ...normalized forecast... },
+  #   cache: { hit:, key:, stored_at: }
+  # }
   class CacheRepository
-    # @param postal_code [String, nil]
-    def initialize(postal_code: nil, location: nil)
+    # Cache time-to-live for normalized forecast payloads.
+    #
+    # @return [ActiveSupport::Duration]
+    TTL = 30.minutes
+
+    # @param postal_code [String] ZIP code used to derive the cache key
+    def initialize(postal_code:)
       @postal_code = postal_code
-      @location = location
     end
 
-    # Reads cached forecast if present.
+    # Reads a cached forecast envelope.
     #
-    # @return [Hash, nil] Cached data or nil.
+    # On a cache hit, a deep-duplicated payload is returned with the `:hit`
+    # metadata updated to `true`. Returning a duplicate prevents accidental
+    # mutation of the cached object in memory.
+    #
+    # @return [Hash, nil] wrapped cached payload or nil on cache miss
     def read
-      normalize(Rails.cache.read(cache_key))
+      cached = Rails.cache.read(cache_key)
+      return unless cached
+
+      cached.deep_dup.tap do |payload|
+        payload[:cache][:hit] = true
+      end
     end
 
-    # Writes forecast data into cache.
+    # Wraps and persists a normalized forecast payload in cache.
     #
-    # @param data [Hash]
-    # @return [void]
+    # @param data [Hash] normalized forecast payload
+    # @return [Hash] wrapped cache payload written to the store
     def write(data)
-      Rails.cache.write(cache_key, data.merge(cached_metadata), expires_in: 30.minutes)
+      payload = wrap(data)
+      Rails.cache.write(cache_key, payload, expires_in: TTL)
+      payload
     end
 
     private
 
-    attr_reader :postal_code, :location
+    attr_reader :postal_code
 
+    # Builds the cache key for the configured ZIP code.
+    #
+    # @return [String]
+    # @raise [ArgumentError] when no postal code is available
     def cache_key
-      key = postal_code.presence || location&.parameterize
-      "weather_forecast_#{key}"
+      raise ArgumentError, "postal_code is required for caching" if postal_code.blank?
+
+      "weather_forecast:#{postal_code}"
     end
 
-    def normalize(data)
-      return unless data
-      data.is_a?(String) ? JSON.parse(data) : data
-    end
-
-    def cached_metadata
+    # Builds the cache envelope returned to callers and stored in the cache.
+    #
+    # @param data [Hash] normalized forecast payload
+    # @return [Hash]
+    def wrap(data)
       {
-        cached: {
-          at: Time.current.in_time_zone("Eastern Time (US & Canada)")
-            .strftime("%b %d, %Y %I:%M %p"),
-          location: location,
-          postal_code: postal_code
+        data: data,
+        cache: {
+          hit: false,
+          key: cache_key,
+          stored_at: Time.current
         }
       }
     end
