@@ -1,29 +1,7 @@
 <% content_for :title, "Forecasts" %>
 
 <div class="app">
-
-  <!-- ─── SIDEBAR ─── -->
-  <aside class="sidebar">
-
-    <div class="search-bar">
-      <span class="thermo">🌡</span>
-      <span>Oklahoma City, USA</span>
-      <span class="search-icon">⌕</span>
-    </div>
-
-    <div>
-      <div class="city-info">
-        <h3>Oklahoma City</h3>
-        <p>The air quality is generally acceptable for most individuals. However, sensitive groups may experience minor to moderate symptoms from long-term exposure.</p>
-      </div>
-
-      <div class="ownership">
-        <span>©</span><%= Date.today.year %> |
-        <a href="https://www.youtube.com/watch?v=dQw4w9WgXcQ">Anthony Lombardi</a>
-      </div>
-    </div>
-
-  </aside>
+  <%= render(ForecastDashboard::SidePanelComponent.new) %>
 
   <!-- ─── MAIN PANEL ─── -->
   <main class="main w-100vw">
