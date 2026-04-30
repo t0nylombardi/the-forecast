@@ -41,5 +41,6 @@ group :test do
   gem "irb"
   gem "rails-controller-testing"
   gem "rspec-rails", "~> 8.0", ">= 8.0.2"
+  gem "simplecov", require: false
   gem "shoulda-matchers"
 end

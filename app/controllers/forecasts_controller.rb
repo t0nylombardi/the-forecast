@@ -37,7 +37,7 @@ class ForecastsController < ApplicationController
   end
 
   def forecast_status(forecast)
-    forecast_error(forecast).present? ? :unprocessable_entity : :ok
+    forecast_error(forecast).present? ? :unprocessable_content : :ok
   end
 
   def dashboard_data_for(forecast: nil, postal_code: nil)
