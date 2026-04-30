@@ -1,46 +1,58 @@
+# frozen_string_literal: true
+
 class ForecastsController < ApplicationController
   def index
-    postal_code = initial_postal_code
-    @forecast = fetch_weather_data(postal_code:)
-    handle_failed_fetch(@forecast) if forecast_error(@forecast).present?
-    @dashboard_data = dashboard_data_for(forecast: @forecast, postal_code:)
+    render_dashboard(initial_postal_code)
   end
 
   def update_forecast
-    postal_code = forecast_params[:postal_code]
-    @forecast = fetch_weather_data(postal_code:)
-    handle_failed_fetch(@forecast) if forecast_error(@forecast).present?
-    @dashboard_data = dashboard_data_for(forecast: @forecast, postal_code:)
-
     respond_to do |format|
-      format.html { render :index, status: forecast_status(@forecast) }
-      format.turbo_stream { render :index, formats: :html, status: forecast_status(@forecast) }
+      result = fetch_forecast(forecast_params[:postal_code])
+
+      format.html do
+        render_dashboard_from_result(result)
+      end
+
+      format.turbo_stream do
+        render_dashboard_from_result(result, turbo: true)
+      end
     end
   end
 
   private
 
+  def render_dashboard(postal_code)
+    result = fetch_forecast(postal_code)
+    render_dashboard_from_result(result)
+  end
+
+  def render_dashboard_from_result(result, turbo: false)
+    if result.failure?
+      flash.now[:alert] = result.error
+    end
+
+    @dashboard_data = dashboard_data_for(
+      forecast: result.data,
+      postal_code: forecast_params[:postal_code]
+    )
+
+    render :index, status: status_for(result)
+  end
+
+  def fetch_forecast(postal_code)
+    return Result.failure("Postal code is required") if postal_code.blank?
+
+    data = Weather::ForecastService.call(postal_code:)
+    Result.success(data)
+  rescue Weather::ForecastService::Failure => e
+    Result.failure(e.message)
+  end
+
   def forecast_params
     params.fetch(:forecast, {}).permit(:postal_code)
   end
 
-  def fetch_weather_data(postal_code:)
-    return {"error" => {"message" => "Postal code is required"}} if postal_code.blank?
-
-    Weather::ForecastService.call(postal_code:)
-  rescue Weather::ForecastService::Failure => e
-    {"error" => {"message" => e.message}}
-  end
-
-  def handle_failed_fetch(forecast)
-    flash.now[:alert] = forecast_error(forecast)
-  end
-
-  def forecast_status(forecast)
-    forecast_error(forecast).present? ? :unprocessable_content : :ok
-  end
-
-  def dashboard_data_for(forecast: nil, postal_code: nil)
+  def dashboard_data_for(forecast:, postal_code:)
     ForecastDashboardPresenter.new(
       forecast: forecast,
       postal_code:
@@ -53,7 +65,7 @@ class ForecastsController < ApplicationController
     nil
   end
 
-  def forecast_error(forecast)
-    forecast&.dig("error", "message") || forecast&.dig(:error, :message)
+  def status_for(result)
+    result.failure? ? :unprocessable_content : :ok
   end
 end
