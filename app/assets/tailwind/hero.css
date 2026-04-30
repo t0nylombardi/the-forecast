@@ -1,3 +1,4 @@
+/* Hero-region typography and spacing. */
 .forecast-hero {
   display: flex;
   flex: 1;
@@ -27,6 +28,7 @@
 }
 
 .forecast-hero__title {
+  /* Cap headline width so long location names still read like hero copy. */
   max-width: 25ch;
   font-family: "DM Serif Display", serif;
   font-size: clamp(2.75rem, 6vw, 4.5rem);
@@ -51,7 +53,6 @@
   flex-shrink: 0;
   font-size: clamp(3rem, 7vw, 4.5rem);
   font-weight: 200;
-  /* letter-spacing: -0.08em; */
   line-height: 1;
 }
 

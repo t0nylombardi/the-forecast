@@ -1,4 +1,6 @@
-<div class="forecast-app" style="background-image: linear-gradient(rgba(8, 10, 14, 0.24), rgba(8, 10, 14, 0.24)), url('<%= data.background_image_path %>');">
+<%# Root dashboard shell. The presenter provides the public asset path for the %>
+<%# active weather background, and the inline shorthand guarantees cover/no-repeat. %>
+<div class="forecast-app" style="background: linear-gradient(rgba(8, 10, 14, 0.24), rgba(8, 10, 14, 0.24)), url('<%= data.background_image_path %>') center center / cover no-repeat;">
   <%= render(ForecastDashboard::SidePanelComponent.new(search_value: data.search_value, sidebar_info: data.sidebar_info)) %>
 
   <main class="forecast-main">

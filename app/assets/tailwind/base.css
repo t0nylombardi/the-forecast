@@ -1,3 +1,4 @@
+/* Global reset and theme variables shared by the forecast dashboard. */
 *, *::before, *::after {
   box-sizing: border-box;
   margin: 0;
@@ -17,6 +18,7 @@
 html,
 body {
   min-height: 100%;
+  /* The page background color remains visible behind the dashboard image. */
   background: var(--forecast-bg);
   color: var(--forecast-text);
   font-family: "DM Sans", sans-serif;
