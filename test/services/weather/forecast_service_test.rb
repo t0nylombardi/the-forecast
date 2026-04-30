@@ -38,21 +38,38 @@ module Weather
       cache = Object.new
       requested_postal_code = nil
       requested_coordinates = nil
+      written_data = nil
+      normalized_input = nil
       raw_forecast = {"current" => {"temp" => 64}}
       normalized_forecast = {current: {temperature: 64}}
-      written_payload = {data: normalized_forecast, cache: {hit: false}}
+      written_payload = {
+        data: normalized_forecast.merge(
+          location: {
+            name: "Brooklyn",
+            country: "US",
+            postal_code: "11201"
+          }
+        ),
+        cache: {hit: false}
+      }
 
       cache.define_singleton_method(:read) { nil }
-      cache.define_singleton_method(:write) { |data| (data == normalized_forecast) ? written_payload : flunk("unexpected cache write") }
+      cache.define_singleton_method(:write) do |data|
+        written_data = data
+        written_payload
+      end
       geocoder.define_singleton_method(:call) do |postal_code|
         requested_postal_code = postal_code
-        {lat: 40.695, lon: -73.989}
+        {lat: 40.695, lon: -73.989, city: "Brooklyn", country: "US", postal_code: "11201"}
       end
       forecast_client.define_singleton_method(:fetch_forecast) do |lat:, lon:|
         requested_coordinates = [lat, lon]
         raw_forecast
       end
-      normalizer.define_singleton_method(:call) { |data| (data == raw_forecast) ? normalized_forecast : flunk("unexpected normalizer input") }
+      normalizer.define_singleton_method(:call) do |data|
+        normalized_input = data
+        normalized_forecast
+      end
 
       service = ForecastService.new(
         postal_code: "11201",
@@ -66,6 +83,10 @@ module Weather
 
       assert_equal "11201", requested_postal_code
       assert_equal [40.695, -73.989], requested_coordinates
+      assert_equal raw_forecast, normalized_input
+      assert_equal written_payload[:data], written_data
+      assert_equal "Brooklyn", result.dig(:data, :location, :name)
+      assert_equal "11201", result.dig(:data, :location, :postal_code)
       assert_equal written_payload, result
     end
 
@@ -95,7 +116,7 @@ module Weather
       cache = Object.new
 
       cache.define_singleton_method(:read) { nil }
-      geocoder.define_singleton_method(:call) { |_postal_code| {lat: 47.6062, lon: -122.3321} }
+      geocoder.define_singleton_method(:call) { |_postal_code| {lat: 47.6062, lon: -122.3321, city: "Seattle", country: "US", postal_code: "98101"} }
       forecast_client.define_singleton_method(:fetch_forecast) do |**_kwargs|
         raise ApiClient::Error, "Weather API request failed"
       end

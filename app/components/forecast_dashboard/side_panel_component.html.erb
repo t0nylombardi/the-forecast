@@ -1,12 +1,8 @@
-<!-- ─── SIDEBAR ─── -->
-  <aside class="sidebar">
+<aside class="forecast-sidebar">
+  <%= render(ForecastDashboard::SidePanel::SearchBarComponent.new(value: search_value)) %>
 
-    <%= render(ForecastDashboard::SidePanel::SearchBarComponent.new) %>
-
-    <div>
-      <%= render(ForecastDashboard::SidePanel::CityInfoComponent.new) %>
-
-      <%= render(ForecastDashboard::SidePanel::OwnershipComponent.new) %>
-    </div>
-
-  </aside>
+  <div class="forecast-sidebar__content">
+    <%= render(ForecastDashboard::SidePanel::CityInfoComponent.new(sidebar_info: sidebar_info)) %>
+    <%= render(ForecastDashboard::SidePanel::OwnershipComponent.new) %>
+  </div>
+</aside>

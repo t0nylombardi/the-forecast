@@ -1,0 +1,16 @@
+<div class="forecast-app">
+  <%= render(ForecastDashboard::SidePanelComponent.new(search_value: data.search_value, sidebar_info: data.sidebar_info)) %>
+
+  <main class="forecast-main">
+    <% if alert.present? %>
+      <div class="forecast-alert" role="alert"><%= alert %></div>
+    <% end %>
+
+    <%= render(ForecastDashboard::HeroComponent.new(hero: data.hero)) %>
+
+    <section class="forecast-bottom-panel">
+      <%= render(ForecastDashboard::WeeklyForecastComponent.new(daily_forecast: data.daily_forecast)) %>
+      <%= render(ForecastDashboard::TemperatureCurveComponent.new(daily_forecast: data.daily_forecast)) %>
+    </section>
+  </main>
+</div>

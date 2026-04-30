@@ -1,0 +1,19 @@
+<div class="temperature-curve" aria-hidden="true">
+  <svg viewBox="0 0 900 55" preserveAspectRatio="none">
+    <defs>
+      <linearGradient id="forecastTemperatureGradient" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0%" stop-color="#e8a832"/>
+        <stop offset="65%" stop-color="#e8a832"/>
+        <stop offset="85%" stop-color="#e05c2a"/>
+        <stop offset="100%" stop-color="#c0392b"/>
+      </linearGradient>
+    </defs>
+    <path
+      d="<%= path_definition %>"
+      fill="none"
+      stroke="url(#forecastTemperatureGradient)"
+      stroke-width="1.5"
+      stroke-linecap="round"
+    />
+  </svg>
+</div>

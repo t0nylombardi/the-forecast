@@ -1,0 +1,47 @@
+.forecast-app {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+}
+
+.forecast-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.forecast-alert {
+  margin: 1rem 2.5rem 0;
+  align-self: flex-start;
+  border: 1px solid rgba(224, 92, 42, 0.45);
+  border-radius: 999px;
+  background: rgba(224, 92, 42, 0.12);
+  color: var(--forecast-text);
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+  padding: 0.55rem 0.9rem;
+}
+
+.forecast-bottom-panel {
+  margin: auto 1.5rem 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 2rem;
+  background: rgba(0, 0, 0, 0.18);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 16px 48px var(--forecast-shadow);
+}
+
+@media (max-width: 900px) {
+  .forecast-app {
+    flex-direction: column;
+  }
+
+  .forecast-bottom-panel {
+    margin: 0 1rem 1rem;
+  }
+
+  .forecast-alert {
+    margin: 1rem 1.25rem 0;
+  }
+}

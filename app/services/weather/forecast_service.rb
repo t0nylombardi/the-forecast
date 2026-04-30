@@ -90,7 +90,13 @@ module Weather
         lon: coordinates[:lon]
       )
 
-      normalized_forecast = normalizer.call(raw_forecast)
+      normalized_forecast = normalizer.call(raw_forecast).merge(
+        location: {
+          name: coordinates[:city],
+          country: coordinates[:country],
+          postal_code: coordinates[:postal_code]
+        }
+      )
 
       cache.write(normalized_forecast)
     end

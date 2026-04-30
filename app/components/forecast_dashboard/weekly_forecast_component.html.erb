@@ -1,0 +1,10 @@
+<div class="weekly-forecast">
+  <% daily_forecast.each do |day| %>
+    <div class="weekly-forecast__day">
+      <span class="weekly-forecast__label"><%= day.label %></span>
+      <span class="weekly-forecast__summary"><%= day.summary %></span>
+      <span class="weekly-forecast__high">high <%= day.high %></span>
+      <span class="weekly-forecast__low">low <%= day.low %></span>
+    </div>
+  <% end %>
+</div>

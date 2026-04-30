@@ -1,23 +1,20 @@
-<%# <div class="search-bar">
-  <span class="thermo">🌡</span>
-  <span>Oklahoma City, USA</span>
-  <span class="search-icon">⌕</span>
-</div> %>
+<%= form_with url: update_forecast_forecasts_path, method: :patch, scope: :forecast, class: "sidebar-search" do |form| %>
+  <label class="sidebar-search__field" for="forecast_postal_code">
+    <svg class="sidebar-search__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
+      <g>
+        <path fill="none" d="M0 0h24v24H0z"></path>
+        <path d="M11 2c4.968 0 9 4.032 9 9s-4.032 9-9 9-9-4.032-9-9 4.032-9 9-9zm0 16c3.867 0 7-3.133 7-7 0-3.868-3.133-7-7-7-3.868 0-7 3.132-7 7 0 3.867 3.132 7 7 7zm8.485.071l2.829 2.828-1.415 1.415-2.828-2.829 1.414-1.414z" fill="currentColor"></path>
+      </g>
+    </svg>
 
-<div class="w-full">
-
-  <div class="flex flex-row items-center justify-around px-16 py-3">
-
-   <svg class="px-4 mx-4 text-white/30" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"> <g> <path fill="none" d="M0 0h24v24H0z"></path> <path d="M11 2c4.968 0 9 4.032 9 9s-4.032 9-9 9-9-4.032-9-9 4.032-9 9-9zm0 16c3.867 0 7-3.133 7-7 0-3.868-3.133-7-7-7-3.868 0-7 3.132-7 7 0 3.867 3.132 7 7 7zm8.485.071l2.829 2.828-1.415 1.415-2.828-2.829 1.414-1.414z" fill="white"></path> </g> </svg>
-
-
-    <input
-      type="text"
-      placeholder="Oklahoma City, USA"
-      class="bg-transparent outline-none text-white placeholder-white/30 text-md mx-4"
-    />
-
-
-
-  </div>
-</div>
+    <%= form.text_field :postal_code,
+      id: "forecast_postal_code",
+      value: value,
+      placeholder: "Enter a ZIP code",
+      class: "sidebar-search__input",
+      inputmode: "numeric",
+      pattern: "[0-9]{5}",
+      maxlength: 5,
+      autocomplete: "off" %>
+  </label>
+<% end %>

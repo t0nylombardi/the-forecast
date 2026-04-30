@@ -1,0 +1,38 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --forecast-bg: #1a1a1a;
+  --forecast-text: #f0ece4;
+  --forecast-text-muted: rgba(240, 236, 228, 0.64);
+  --forecast-text-dim: rgba(240, 236, 228, 0.38);
+  --forecast-border: rgba(255, 255, 255, 0.1);
+  --forecast-panel: rgba(8, 10, 14, 0.24);
+  --forecast-shadow: rgba(0, 0, 0, 0.28);
+}
+
+html,
+body {
+  min-height: 100%;
+  background: var(--forecast-bg) url(/cloudy-rain.jpg) center center / cover no-repeat;
+  color: var(--forecast-text);
+  font-family: "DM Sans", sans-serif;
+  font-weight: 300;
+}
+
+body {
+  overflow-x: hidden;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+input,
+button {
+  font: inherit;
+}

@@ -4,7 +4,7 @@ module ForecastDashboard
   module SidePanel
     class OwnershipComponent < ViewComponent::Base
       def initialize
-        @url = "https://www.youtube.com/watch?v=dQw4w9WgXcQ" # <~~ Heh
+        @url = "https://github.com/t0nylombardi"
       end
     end
   end
