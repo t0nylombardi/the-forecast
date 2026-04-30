@@ -1,4 +1,4 @@
-<div class="forecast-app">
+<div class="forecast-app" style="background-image: linear-gradient(rgba(8, 10, 14, 0.24), rgba(8, 10, 14, 0.24)), url('<%= data.background_image_path %>');">
   <%= render(ForecastDashboard::SidePanelComponent.new(search_value: data.search_value, sidebar_info: data.sidebar_info)) %>
 
   <main class="forecast-main">

@@ -39,6 +39,7 @@ RSpec.describe ForecastDashboardPresenter do
       expect(data.hero.description).to include("High 76° / Low 60°")
       expect(data.daily_forecast.first.label).to eq("Thu")
       expect(data.daily_forecast.first.summary).to eq("Sunny")
+      expect(data.background_image_path).to eq("/weather/sunny.jpg")
     end
 
     it "falls back cleanly when no forecast is present" do
@@ -48,6 +49,18 @@ RSpec.describe ForecastDashboardPresenter do
       expect(data.hero.timestamp).to eq("Weather data unavailable")
       expect(data.daily_forecast.length).to eq(7)
       expect(data.daily_forecast.first.high).to eq("--")
+      expect(data.background_image_path).to eq("/weather/sunny.jpg")
+    end
+
+    it "uses the rainy background for rainy descriptions" do
+      forecast = {
+        current: {temperature: 54, description: "light rain"},
+        daily: []
+      }
+
+      data = described_class.new(forecast:, postal_code: "10001").dashboard_data
+
+      expect(data.background_image_path).to eq("/weather/cloudy-rain.jpg")
     end
   end
 end

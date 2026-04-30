@@ -4,21 +4,13 @@ class ForecastDashboardPresenter
   DailyForecast = Data.define(:label, :summary, :high, :low)
   SidebarInfo = Data.define(:location_name, :postal_code)
   Hero = Data.define(:title, :timestamp, :temperature, :description)
-  DashboardData = Data.define(
-    :search_value,
-    :sidebar_info,
-    :hero,
-    :daily_forecast
-  )
+  DashboardData = Data.define(:search_value, :sidebar_info, :hero, :daily_forecast, :background_image_path)
 
-  DEFAULT_TITLE = "Forecast"
-  DEFAULT_TIMESTAMP = "Weather data unavailable"
   DEFAULT_DESCRIPTION = "Enter a valid US ZIP code to load the current weather and 7-day forecast."
 
-  def initialize(forecast:, postal_code: nil)
-    @forecast = forecast&.deep_symbolize_keys || {}
-    @forecast_data = @forecast[:data] || @forecast
-    @postal_code = postal_code.presence || @forecast_data.dig(:location, :postal_code)
+  def initialize(forecast:, postal_code:)
+    @forecast = forecast&.dig(:data) || forecast || {}
+    @postal_code = postal_code
   end
 
   def dashboard_data
@@ -26,13 +18,14 @@ class ForecastDashboardPresenter
       search_value: postal_code.to_s,
       sidebar_info: sidebar_info,
       hero: hero,
-      daily_forecast: daily_forecast
+      daily_forecast: daily_forecast,
+      background_image_path: background_image_path
     )
   end
 
   private
 
-  attr_reader :forecast_data, :postal_code
+  attr_reader :forecast, :postal_code
 
   def sidebar_info
     SidebarInfo.new(
@@ -43,86 +36,86 @@ class ForecastDashboardPresenter
 
   def hero
     Hero.new(
-      title: hero_title,
-      timestamp: formatted_timestamp,
-      temperature: formatted_temperature(current_temperature),
-      description: current_description
+      title: location_name,
+      timestamp: Formatters::WeatherFormatter.timestamp(current_time, postal_code:),
+      temperature: Formatters::WeatherFormatter.temperature(current_temp),
+      description: description
     )
   end
 
   def daily_forecast
-    return fallback_daily_forecast if forecast_days.empty?
+    return fallback_forecast if days.empty?
 
-    forecast_days.first(7).map do |day|
+    days.first(7).map do |day|
       DailyForecast.new(
-        label: formatted_day_label(day[:date]),
+        label: Formatters::WeatherFormatter.day_label(day[:date]),
         summary: day[:description].to_s.capitalize,
-        high: formatted_temperature(day[:high]),
-        low: formatted_temperature(day[:low])
+        high: Formatters::WeatherFormatter.temperature(day[:high]),
+        low: Formatters::WeatherFormatter.temperature(day[:low])
       )
     end
   end
 
   def location_name
-    [forecast_data.dig(:location, :name), forecast_data.dig(:location, :country)].compact_blank.join(", ").presence || "Unknown location"
+    [forecast.dig(:location, :name), forecast.dig(:location, :country)]
+      .compact_blank
+      .join(", ")
+      .presence || "Unknown location"
   end
 
-  def hero_title
-    location_name.presence || DEFAULT_TITLE
+  def current_time
+    forecast.dig(:current, :time)
   end
 
-  def formatted_timestamp
-    current_time = forecast_data.dig(:current, :time)
-    return DEFAULT_TIMESTAMP unless current_time.respond_to?(:strftime)
+  def current_temp
+    forecast.dig(:current, :temperature)
+  end
 
+  def description
     [
-      postal_code.presence,
-      current_time.strftime("%A, %b %-d, %Y, %-I:%M%p")
-    ].compact.join(" · ")
+      current_description&.capitalize,
+      today_range
+    ].compact.join(". ").presence || DEFAULT_DESCRIPTION
   end
 
-  def current_temperature
-    forecast_data.dig(:current, :temperature)
+  def background_image_path
+    description_text = current_description.to_s.downcase
+
+    return "/weather/thunder.jpg" if description_text.match?(/thunder|storm/)
+    return "/weather/snowing.jpg" if description_text.match?(/snow|sleet|blizzard|flurr/)
+    return "/weather/cloudy-rain.jpg" if description_text.match?(/rain|drizzle|shower|mist|fog/)
+    return "/weather/sunny.jpg" if description_text.match?(/sun|clear/)
+    return "/weather/sunny.jpg" if current_temp.blank?
+    return "/weather/hot.jpg" if current_temp.to_f >= 85
+    return "/weather/freezing.jpg" if current_temp.to_f <= 20
+    return "/weather/cold.jpg" if current_temp.to_f <= 45
+
+    "/weather/sunny.jpg"
+  end
+
+  def days
+    Array(forecast[:daily])
   end
 
   def current_description
-    details = []
-    details << forecast_data.dig(:current, :description).to_s.capitalize.presence
-    details << today_temperature_range
-    details.compact.join(". ").presence || DEFAULT_DESCRIPTION
+    forecast.dig(:current, :description)
   end
 
-  def forecast_days
-    Array(forecast_data[:daily])
+  def today_range
+    today = days.first
+    return if today.blank?
+
+    "High #{Formatters::WeatherFormatter.temperature(today[:high])} / Low #{Formatters::WeatherFormatter.temperature(today[:low])}"
   end
 
-  def fallback_daily_forecast
-    7.times.map do |index|
+  def fallback_forecast
+    7.times.map do |i|
       DailyForecast.new(
-        label: (Date.current + index.days).strftime("%a"),
+        label: (Date.current + i.days).strftime("%a"),
         summary: "No forecast data",
         high: "--",
         low: "--"
       )
     end
-  end
-
-  def formatted_day_label(date)
-    return date.strftime("%a") if date.respond_to?(:strftime)
-
-    date.to_s
-  end
-
-  def formatted_temperature(value)
-    return "--" if value.blank?
-
-    "#{value.round}°"
-  end
-
-  def today_temperature_range
-    today = forecast_days.first
-    return if today.blank?
-
-    "High #{formatted_temperature(today[:high])} / Low #{formatted_temperature(today[:low])}"
   end
 end

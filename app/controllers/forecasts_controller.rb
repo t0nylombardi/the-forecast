@@ -27,22 +27,24 @@ class ForecastsController < ApplicationController
   end
 
   def render_dashboard_from_result(result, turbo: false)
-    if result.failure?
-      flash.now[:alert] = result.error
-    end
+    flash.now[:alert] = result.error if result.failure?
 
     @dashboard_data = dashboard_data_for(
       forecast: result.data,
       postal_code: forecast_params[:postal_code]
     )
 
-    render :index, status: status_for(result)
+    if turbo
+      render :index, formats: :html, status: status_for(result)
+    else
+      render :index, status: status_for(result)
+    end
   end
 
   def fetch_forecast(postal_code)
     return Result.failure("Postal code is required") if postal_code.blank?
 
-    data = Weather::ForecastService.call(postal_code:)
+    data = Weather::ForecastService.call(postal_code:)[:data]
     Result.success(data)
   rescue Weather::ForecastService::Failure => e
     Result.failure(e.message)

@@ -17,7 +17,7 @@
 html,
 body {
   min-height: 100%;
-  background: var(--forecast-bg) url(/cloudy-rain.jpg) center center / cover no-repeat;
+  background: var(--forecast-bg);
   color: var(--forecast-text);
   font-family: "DM Sans", sans-serif;
   font-weight: 300;

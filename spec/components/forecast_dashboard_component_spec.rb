@@ -31,6 +31,7 @@ RSpec.describe ForecastDashboardComponent, type: :component do
     expect(result.css(".forecast-brand").text).to match(/The\s*Forecast/)
     expect(result.text).to include("New York, US")
     expect(result.css(".weekly-forecast__day").length).to eq(7)
+    expect(result.at_css(".forecast-app")["style"]).to include("/weather/sunny.jpg")
   end
 
   it "renders an alert when one is present" do
