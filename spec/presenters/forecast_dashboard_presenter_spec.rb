@@ -62,5 +62,16 @@ RSpec.describe ForecastDashboardPresenter do
 
       expect(data.background_image_path).to eq("/weather/cloudy-rain.jpg")
     end
+
+    it "falls back to weather condition text when description is missing" do
+      forecast = {
+        current: {temperature: 54, condition: "Rain"},
+        daily: []
+      }
+
+      data = described_class.new(forecast:, postal_code: "10001").dashboard_data
+
+      expect(data.background_image_path).to eq("/weather/cloudy-rain.jpg")
+    end
   end
 end

@@ -73,22 +73,22 @@ class ForecastDashboardPresenter
 
   def description
     [
-      current_description&.capitalize,
+      weather_text&.capitalize,
       today_range
     ].compact.join(". ").presence || DEFAULT_DESCRIPTION
   end
 
   def background_image_path
-    description_text = current_description.to_s.downcase
+    description_text = weather_text.to_s.downcase
 
     return "/weather/thunder.jpg" if description_text.match?(/thunder|storm/)
     return "/weather/snowing.jpg" if description_text.match?(/snow|sleet|blizzard|flurr/)
-    return "/weather/cloudy-rain.jpg" if description_text.match?(/rain|drizzle|shower|mist|fog/)
+    return "/weather/cloudy-rain.jpg" if description_text.match?(/cloud|overcast|rain|drizzle|shower|mist|fog/)
+    return "/weather/cold.jpg" if description_text.match?(/freeze|cold|snow/) && current_temp.to_f <= 32
     return "/weather/sunny.jpg" if description_text.match?(/sun|clear/)
     return "/weather/sunny.jpg" if current_temp.blank?
     return "/weather/hot.jpg" if current_temp.to_f >= 85
     return "/weather/freezing.jpg" if current_temp.to_f <= 20
-    return "/weather/cold.jpg" if current_temp.to_f <= 45
 
     "/weather/sunny.jpg"
   end
@@ -97,8 +97,11 @@ class ForecastDashboardPresenter
     Array(forecast[:daily])
   end
 
-  def current_description
-    forecast.dig(:current, :description)
+  def weather_text
+    forecast.dig(:current, :description) ||
+      forecast.dig(:current, :condition) ||
+      forecast.dig(:daily, 0, :description) ||
+      forecast.dig(:daily, 0, :condition)
   end
 
   def today_range
