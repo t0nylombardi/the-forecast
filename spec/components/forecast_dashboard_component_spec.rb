@@ -23,7 +23,7 @@ RSpec.describe ForecastDashboardComponent, type: :component do
           end
         }
       },
-      postal_code: "10001"
+      address: "New York, NY 10001"
     )
 
     result = render_inline(described_class.new(data: presenter.dashboard_data))
@@ -36,7 +36,7 @@ RSpec.describe ForecastDashboardComponent, type: :component do
   end
 
   it "renders an alert when one is present" do
-    data = ForecastDashboardPresenter.new(forecast: nil, postal_code: "10001").dashboard_data
+    data = ForecastDashboardPresenter.new(forecast: nil, address: "10001").dashboard_data
 
     result = render_inline(described_class.new(data:, alert: "ZIP not found"))
 

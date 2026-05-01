@@ -25,14 +25,16 @@ RSpec.describe ForecastDashboardPresenter do
               low: 60.2
             }
           ]
-        }
+        },
+        cache: {hit: true}
       }
 
-      data = described_class.new(forecast: forecast, postal_code: "10001").dashboard_data
+      data = described_class.new(forecast: forecast, address: "123 Main St, New York, NY 10001").dashboard_data
 
-      expect(data.search_value).to eq("10001")
+      expect(data.search_value).to eq("123 Main St, New York, NY 10001")
       expect(data.sidebar_info.location_name).to eq("New York, US")
       expect(data.sidebar_info.postal_code).to eq("10001")
+      expect(data.sidebar_info.cache_hit).to be(true)
       expect(data.hero.title).to eq("New York, US")
       expect(data.hero.temperature).to eq("72°")
       expect(data.hero.description).to include("Sunny")
@@ -43,7 +45,7 @@ RSpec.describe ForecastDashboardPresenter do
     end
 
     it "falls back cleanly when no forecast is present" do
-      data = described_class.new(forecast: nil, postal_code: nil).dashboard_data
+      data = described_class.new(forecast: nil, address: nil).dashboard_data
 
       expect(data.search_value).to eq("")
       expect(data.hero.timestamp).to eq("Weather data unavailable")
@@ -58,7 +60,7 @@ RSpec.describe ForecastDashboardPresenter do
         daily: []
       }
 
-      data = described_class.new(forecast:, postal_code: "10001").dashboard_data
+      data = described_class.new(forecast:, address: "10001").dashboard_data
 
       expect(data.background_image_path).to eq("/weather/cloudy-rain.jpg")
     end
@@ -69,7 +71,7 @@ RSpec.describe ForecastDashboardPresenter do
         daily: []
       }
 
-      data = described_class.new(forecast:, postal_code: "10001").dashboard_data
+      data = described_class.new(forecast:, address: "10001").dashboard_data
 
       expect(data.background_image_path).to eq("/weather/cloudy-rain.jpg")
     end

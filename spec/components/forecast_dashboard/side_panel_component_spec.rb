@@ -6,7 +6,8 @@ RSpec.describe ForecastDashboard::SidePanelComponent, type: :component do
   it "renders the search form and sidebar metadata" do
     sidebar_info = ForecastDashboardPresenter::SidebarInfo.new(
       location_name: "New York, US",
-      postal_code: "10001"
+      postal_code: "10001",
+      cache_hit: false
     )
 
     result = render_inline(described_class.new(search_value: "10001", sidebar_info:))

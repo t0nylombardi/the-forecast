@@ -12,6 +12,7 @@ RSpec.describe ForecastDashboard::SidePanel::SearchBarComponent, type: :componen
     expect(form["action"]).to eq(Rails.application.routes.url_helpers.update_forecast_forecasts_path)
     expect(form["data-turbo"]).to eq("false")
     expect(input["value"]).to eq("10001")
-    expect(input["name"]).to eq("forecast[postal_code]")
+    expect(input["name"]).to eq("forecast[address]")
+    expect(input["placeholder"]).to eq("Enter address or ZIP")
   end
 end

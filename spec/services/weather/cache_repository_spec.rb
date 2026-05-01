@@ -55,6 +55,16 @@ RSpec.describe Weather::CacheRepository do
       end
     end
 
+    it "uses the canonical 5-digit ZIP for ZIP+4 cache keys" do
+      repository = described_class.new(postal_code: "10001-1234")
+      cache = instance_double(ActiveSupport::Cache::Store)
+
+      allow(Rails).to receive(:cache).and_return(cache)
+      allow(cache).to receive(:read).with("weather_forecast:10001").and_return(nil)
+
+      expect(repository.read).to be_nil
+    end
+
     it "raises when postal code is blank" do
       repository = described_class.new(postal_code: nil)
       allow(Rails).to receive(:cache).and_return(instance_double(ActiveSupport::Cache::Store))

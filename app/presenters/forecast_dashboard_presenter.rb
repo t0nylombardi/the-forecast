@@ -9,26 +9,27 @@ class ForecastDashboardPresenter
   # Lightweight row object for the weekly forecast strip.
   DailyForecast = Data.define(:label, :summary, :high, :low)
   # Sidebar metadata shown beside the dashboard.
-  SidebarInfo = Data.define(:location_name, :postal_code)
+  SidebarInfo = Data.define(:location_name, :postal_code, :cache_hit)
   # Primary hero content displayed at the top of the dashboard.
   Hero = Data.define(:title, :timestamp, :temperature, :description)
   # Full dashboard view model consumed by `ForecastDashboardComponent`.
   DashboardData = Data.define(:search_value, :sidebar_info, :hero, :daily_forecast, :background_image_path)
 
-  DEFAULT_DESCRIPTION = "Enter a valid US ZIP code to load the current weather and 7-day forecast."
+  DEFAULT_DESCRIPTION = "Enter a US address with a ZIP code to load the current weather and 7-day forecast."
 
   # @param forecast [Hash, nil] normalized forecast payload, optionally wrapped
   #   in a `{ data: ... }` envelope
-  # @param postal_code [String, nil]
-  def initialize(forecast:, postal_code:)
+  # @param address [String, nil] submitted address/search string
+  def initialize(forecast:, address: nil, postal_code: nil)
+    @cache = forecast&.dig(:cache) || {}
     @forecast = forecast&.dig(:data) || forecast || {}
-    @postal_code = postal_code
+    @address = address.presence || postal_code
   end
 
   # @return [DashboardData]
   def dashboard_data
     DashboardData.new(
-      search_value: postal_code.to_s,
+      search_value: address.to_s,
       sidebar_info: sidebar_info,
       hero: hero,
       daily_forecast: daily_forecast,
@@ -38,13 +39,14 @@ class ForecastDashboardPresenter
 
   private
 
-  attr_reader :forecast, :postal_code
+  attr_reader :forecast, :address, :cache
 
   # @return [SidebarInfo]
   def sidebar_info
     SidebarInfo.new(
       location_name: location_name,
-      postal_code: postal_code
+      postal_code: display_postal_code,
+      cache_hit: cache[:hit] == true
     )
   end
 
@@ -52,7 +54,7 @@ class ForecastDashboardPresenter
   def hero
     Hero.new(
       title: location_name,
-      timestamp: Formatters::WeatherFormatter.timestamp(current_time, postal_code:),
+      timestamp: Formatters::WeatherFormatter.timestamp(current_time, postal_code: display_postal_code),
       temperature: Formatters::WeatherFormatter.temperature(current_temp),
       description: description
     )
@@ -78,6 +80,11 @@ class ForecastDashboardPresenter
       .compact_blank
       .join(", ")
       .presence || "Unknown location"
+  end
+
+  # @return [String, nil]
+  def display_postal_code
+    forecast.dig(:location, :postal_code).presence || Weather::AddressParser.postal_code(address)
   end
 
   # @return [Time, nil]

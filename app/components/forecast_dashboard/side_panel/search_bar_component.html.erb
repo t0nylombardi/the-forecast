@@ -1,5 +1,5 @@
 <%= form_with url: update_forecast_forecasts_path, method: :patch, scope: :forecast, class: "sidebar-search", data: {turbo: false} do |form| %>
-  <label class="sidebar-search__field" for="forecast_postal_code">
+  <label class="sidebar-search__field" for="forecast_address">
     <svg class="sidebar-search__icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" aria-hidden="true">
       <g>
         <path fill="none" d="M0 0h24v24H0z"></path>
@@ -7,14 +7,12 @@
       </g>
     </svg>
 
-    <%= form.text_field :postal_code,
-      id: "forecast_postal_code",
+    <%= form.text_field :address,
+      id: "forecast_address",
       value: value,
-      placeholder: "Enter a ZIP code",
+      placeholder: "Enter address or ZIP",
       class: "sidebar-search__input",
-      inputmode: "numeric",
-      pattern: "[0-9]{5}",
-      maxlength: 5,
+      inputmode: "search",
       autocomplete: "off" %>
   </label>
 <% end %>

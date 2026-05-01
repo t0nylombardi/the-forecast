@@ -3,16 +3,20 @@
 require "rails_helper"
 
 RSpec.describe Weather::ApiClient do
-  class TestClient < described_class
-    def fetch_payload
-      send(
-        :get_json,
-        "https://example.com/weather",
-        query: {appid: send(:api_key)},
-        default_error: "Request failed"
-      )
+  let(:test_client_class) do
+    Class.new(described_class) do
+      def fetch_payload
+        send(
+          :get_json,
+          "https://example.com/weather",
+          query: {appid: send(:api_key)},
+          default_error: "Request failed"
+        )
+      end
     end
   end
+
+  let(:test_client) { test_client_class.new }
 
   describe "#get_json" do
     it "returns parsed JSON for successful responses" do
@@ -28,7 +32,7 @@ RSpec.describe Weather::ApiClient do
           TestResponse.new(body: {status: "ok"}.to_json, success?: true)
         end
 
-        result = TestClient.new.fetch_payload
+        result = test_client.fetch_payload
 
         expect(request_url).to eq("https://example.com/weather")
         expect(request_query).to eq(appid: "test-key")
@@ -39,7 +43,7 @@ RSpec.describe Weather::ApiClient do
 
     it "raises when the API key is missing" do
       with_weather_api_key(nil) do
-        expect { TestClient.new.fetch_payload }
+        expect { test_client.fetch_payload }
           .to raise_error(described_class::Error, "Missing OpenWeather API key")
       end
     end
@@ -49,7 +53,7 @@ RSpec.describe Weather::ApiClient do
         allow(HTTParty).to receive(:get)
           .and_return(TestResponse.new(body: {message: "city not found"}.to_json, success?: false))
 
-        expect { TestClient.new.fetch_payload }
+        expect { test_client.fetch_payload }
           .to raise_error(described_class::Error, "city not found")
       end
     end
@@ -59,7 +63,7 @@ RSpec.describe Weather::ApiClient do
         allow(HTTParty).to receive(:get)
           .and_return(TestResponse.new(body: "not-json", success?: false))
 
-        expect { TestClient.new.fetch_payload }
+        expect { test_client.fetch_payload }
           .to raise_error(described_class::Error, "Request failed")
       end
     end

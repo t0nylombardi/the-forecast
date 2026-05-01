@@ -1,34 +1,34 @@
 # frozen_string_literal: true
 
-# Renders the forecast dashboard and processes ZIP-code lookups.
+# Renders the forecast dashboard and processes address-based forecast lookups.
 #
 # The controller keeps routing and response concerns here while delegating
 # forecast retrieval to `Weather::ForecastService` and dashboard shaping to
 # `ForecastDashboardPresenter`.
 class ForecastsController < ApplicationController
-  # Loads the dashboard for the best available ZIP code.
+  # Loads the dashboard for the best available address or ZIP code.
   #
   # Resolution order:
-  # 1. ZIP code submitted in the current request
-  # 2. `postal_code` in the root-route query string
+  # 1. Address submitted in the current request
+  # 2. `address` or legacy `postal_code` in the root-route query string
   # 3. ZIP code inferred from the visitor IP address
   def index
-    render_dashboard(selected_postal_code)
+    render_dashboard(selected_address)
   end
 
-  # Handles ZIP-code submissions from the dashboard search form.
+  # Handles address submissions from the dashboard search form.
   #
   # HTML requests use a PRG flow and redirect back to `root_path`, preserving
   # the ZIP code as a query parameter so refreshes do not resubmit PATCH.
   # Turbo Stream requests render the dashboard body directly.
   def update_forecast
     respond_to do |format|
-      postal_code = forecast_postal_code
-      result = fetch_forecast(postal_code)
+      address = forecast_address
+      result = fetch_forecast(address)
 
       format.html do
         flash[:alert] = result.error if result.failure?
-        redirect_to root_path(postal_code:)
+        redirect_to root_path(address:)
       end
 
       format.turbo_stream do
@@ -52,7 +52,7 @@ class ForecastsController < ApplicationController
 
     @dashboard_data = dashboard_data_for(
       forecast: result.data,
-      postal_code: selected_postal_code
+      address: selected_address
     )
 
     if turbo
@@ -62,13 +62,12 @@ class ForecastsController < ApplicationController
     end
   end
 
-  # @param postal_code [String, nil]
+  # @param address [String, nil]
   # @return [Result]
-  def fetch_forecast(postal_code)
-    return Result.failure("Postal code is required") if postal_code.blank?
+  def fetch_forecast(address)
+    return Result.failure("Address with a 5-digit ZIP code is required") if address.blank?
 
-    data = Weather::ForecastService.call(postal_code:)[:data]
-    Result.success(data)
+    Result.success(Weather::ForecastService.call(address:))
   rescue Weather::ForecastService::Failure => e
     Result.failure(e.message)
   end
@@ -77,21 +76,21 @@ class ForecastsController < ApplicationController
   #
   # @return [ActionController::Parameters]
   def forecast_params
-    params.fetch(:forecast, {}).permit(:postal_code)
+    params.fetch(:forecast, {}).permit(:address, :postal_code)
   end
 
   # @return [String, nil]
-  def forecast_postal_code
-    forecast_params[:postal_code]
+  def forecast_address
+    forecast_params[:address].presence || forecast_params[:postal_code]
   end
 
   # @param forecast [Hash, nil]
-  # @param postal_code [String, nil]
+  # @param address [String, nil]
   # @return [ForecastDashboardPresenter::DashboardData]
-  def dashboard_data_for(forecast:, postal_code:)
+  def dashboard_data_for(forecast:, address:)
     ForecastDashboardPresenter.new(
       forecast: forecast,
-      postal_code:
+      address:
     ).dashboard_data
   end
 
@@ -103,8 +102,8 @@ class ForecastsController < ApplicationController
   end
 
   # @return [String, nil]
-  def selected_postal_code
-    forecast_postal_code.presence || params[:postal_code].presence || initial_postal_code
+  def selected_address
+    forecast_address.presence || params[:address].presence || params[:postal_code].presence || initial_postal_code
   end
 
   # @param result [Result]

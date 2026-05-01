@@ -22,7 +22,7 @@ module Weather
 
     # @param postal_code [String] ZIP code used to derive the cache key
     def initialize(postal_code:)
-      @postal_code = postal_code
+      @postal_code = AddressParser.postal_code(postal_code) || postal_code
     end
 
     # Reads a cached forecast envelope.

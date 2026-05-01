@@ -9,6 +9,8 @@ shapes.
 
 ## Design Intent
 
+- `AddressParser` extracts the canonical 5-digit ZIP code from submitted
+  address text so forecast caching remains ZIP-based.
 - `ForecastService` is the orchestration entry point for the forecast lookup
   use case.
 - `Geocoder` is responsible for resolving a US ZIP code into normalized
@@ -22,16 +24,17 @@ shapes.
 
 ## Request Flow
 
-1. A caller invokes `Weather::ForecastService.call(postal_code: ...)`.
-2. The service checks the cache for an existing normalized forecast.
-3. On a cache miss, the service asks `Weather::Geocoder` to resolve the ZIP
+1. A caller invokes `Weather::ForecastService.call(address: ...)`.
+2. The service extracts a canonical ZIP code from the submitted address.
+3. The service checks the cache for an existing normalized forecast by ZIP code.
+4. On a cache miss, the service asks `Weather::Geocoder` to resolve the ZIP
    code into coordinates.
-4. `Weather::Geocoder` delegates the HTTP call to `Weather::GeocoderClient`.
-5. The service asks `Weather::ForecastClient` for the raw One Call forecast
+5. `Weather::Geocoder` delegates the HTTP call to `Weather::GeocoderClient`.
+6. The service asks `Weather::ForecastClient` for the raw One Call forecast
    using the resolved coordinates.
-6. `Weather::ForecastNormalizer` transforms the raw OpenWeather payload into
+7. `Weather::ForecastNormalizer` transforms the raw OpenWeather payload into
    the app's normalized response shape.
-7. `Weather::CacheRepository` persists the normalized payload and returns the
+8. `Weather::CacheRepository` persists the normalized payload and returns the
    wrapped cache response.
 
 ## Architectural Boundaries

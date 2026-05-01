@@ -4,9 +4,9 @@ require "ipaddr"
 
 module Location
   class IpLookupService
-    LOOKUP_URL = "http://ip-api.com/json".freeze
+    LOOKUP_URL = "http://ip-api.com/json"
     FALLBACK_IP = "69.118.160.235"
-    FIELDS = "status,zip".freeze
+    FIELDS = "status,zip"
     TIMEOUT_SECONDS = 5
 
     class Failure < StandardError; end

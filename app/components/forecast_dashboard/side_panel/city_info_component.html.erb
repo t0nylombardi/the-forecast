@@ -3,4 +3,7 @@
   <% if sidebar_info.postal_code.present? %>
     <p class="sidebar-city-info__meta">ZIP <%= sidebar_info.postal_code %></p>
   <% end %>
+  <% if sidebar_info.cache_hit %>
+    <p class="sidebar-city-info__meta">Loaded from cache</p>
+  <% end %>
 </section>

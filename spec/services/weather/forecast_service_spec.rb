@@ -4,9 +4,9 @@ require "rails_helper"
 
 RSpec.describe Weather::ForecastService do
   describe ".call" do
-    it "raises when postal code is blank" do
-      expect { described_class.call(postal_code: nil) }
-        .to raise_error(described_class::Failure, "Postal code is required")
+    it "raises when the address does not include a ZIP code" do
+      expect { described_class.call(address: "New York, NY") }
+        .to raise_error(described_class::Failure, "Address with a 5-digit ZIP code is required")
     end
   end
 
@@ -22,7 +22,7 @@ RSpec.describe Weather::ForecastService do
       allow(geocoder).to receive(:call)
 
       service = described_class.new(
-        postal_code: "11201",
+        address: "55 Water St, Brooklyn, NY 11201",
         geocoder: geocoder,
         forecast_client: forecast_client,
         normalizer: normalizer,
@@ -55,7 +55,7 @@ RSpec.describe Weather::ForecastService do
       allow(normalizer).to receive(:call).with(raw_forecast).and_return(normalized_forecast)
 
       service = described_class.new(
-        postal_code: "11201",
+        address: "55 Water St, Brooklyn, NY 11201",
         geocoder: geocoder,
         forecast_client: forecast_client,
         normalizer: normalizer,
@@ -78,7 +78,7 @@ RSpec.describe Weather::ForecastService do
       allow(geocoder).to receive(:call).and_raise(Weather::Geocoder::Error, "ZIP not found")
 
       service = described_class.new(
-        postal_code: "00000",
+        address: "Nowhere, NY 00000",
         geocoder: geocoder,
         forecast_client: instance_double(Weather::ForecastClient),
         normalizer: class_double(Weather::ForecastNormalizer),
@@ -99,7 +99,7 @@ RSpec.describe Weather::ForecastService do
         .and_raise(Weather::ApiClient::Error, "Weather API request failed")
 
       service = described_class.new(
-        postal_code: "98101",
+        address: "Seattle, WA 98101",
         geocoder: geocoder,
         forecast_client: forecast_client,
         normalizer: class_double(Weather::ForecastNormalizer),
