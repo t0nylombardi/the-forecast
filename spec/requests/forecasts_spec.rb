@@ -16,19 +16,29 @@ RSpec.describe "Forecasts", type: :request do
       expect(response.body).to include("New York, US")
       expect(response.body).to include(update_forecast_forecasts_path)
     end
+
+    it "uses the postal code from the root query string when present" do
+      payload = forecast_payload(postal_code: "10590", city: "South Salem")
+
+      allow(Weather::ForecastService).to receive(:call).with(postal_code: "10590").and_return(payload)
+      expect(Location::IpLookupService).not_to receive(:call)
+
+      get root_path, params: {postal_code: "10590"}
+
+      expect(response).to have_http_status(:ok)
+      expect(response.body).to include("South Salem, US")
+    end
   end
 
   describe "PATCH /forecasts/update_forecast" do
-    it "renders the updated forecast for html requests" do
+    it "redirects html requests back to the root route with the postal code" do
       payload = forecast_payload(postal_code: "10590", city: "South Salem", temperature: 61, description: "Cloudy")
 
       allow(Weather::ForecastService).to receive(:call).with(postal_code: "10590").and_return(payload)
 
       patch update_forecast_forecasts_path, params: {forecast: {postal_code: "10590"}}
 
-      expect(response).to have_http_status(:ok)
-      expect(response.body).to include("South Salem, US")
-      expect(response.body).to include("61°")
+      expect(response).to redirect_to(root_path(postal_code: "10590"))
     end
 
     it "renders the updated forecast for turbo stream requests" do
